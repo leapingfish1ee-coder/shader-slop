@@ -81,6 +81,9 @@ uniform float u_radialSkew;
 uniform float u_speed;
 uniform float u_loopLength;
 
+const float PI=3.141592653589793;
+const float TAU=6.283185307179586;
+
 float hash21(vec2 p){
   p=fract(p*vec2(123.34,456.21));
   p+=dot(p,p+45.32);
@@ -103,7 +106,7 @@ float valueNoise(vec2 p){
 }
 
 vec2 grad2(vec2 p){
-  float a=6.28318530718*hash21(p);
+  float a=TAU*hash21(p);
   return vec2(cos(a),sin(a));
 }
 
@@ -151,9 +154,14 @@ float sampleNoise(vec2 p){
   return hash21(floor(p*4.0));
 }
 
-vec2 polarSample(float angle,float radial){
-  vec2 ring=vec2(cos(angle),sin(angle))*u_angularScale;
-  return ring+vec2(radial,radial*u_radialSkew);
+float periodicAngularNoise(vec2 p,float period){
+  float x=mod(p.x,period);
+  if(x<0.0)x+=period;
+  float t=x/period;
+  t=t*t*(3.0-2.0*t);
+  float a=sampleNoise(vec2(x,p.y));
+  float b=sampleNoise(vec2(x-period,p.y));
+  return mix(a,b,t);
 }
 
 void main(){
@@ -161,14 +169,20 @@ void main(){
   vec2 centered=uv*2.0-1.0;
   float radius=length(centered);
   float angle=atan(centered.y,centered.x);
+  float angularPeriod=max(u_angularScale,0.001);
+  float angle01=(angle+PI)/TAU;
   float loopLength=max(u_loopLength,0.001);
   float phase=mod(u_time*u_speed,loopLength);
   if(phase<0.0)phase+=loopLength;
   float blend=smoothstep(0.0,1.0,phase/loopLength);
   float radial=radius*u_radialScale;
-  vec2 p0=polarSample(angle,radial+phase);
-  vec2 p1=polarSample(angle,radial+phase-loopLength);
-  float n=mix(sampleNoise(p0),sampleNoise(p1),blend);
+  float radial0=radial+phase;
+  float radial1=radial+phase-loopLength;
+  vec2 p0=vec2(angle01*angularPeriod+radial0*u_radialSkew,radial0);
+  vec2 p1=vec2(angle01*angularPeriod+radial1*u_radialSkew,radial1);
+  float n0=periodicAngularNoise(p0,angularPeriod);
+  float n1=periodicAngularNoise(p1,angularPeriod);
+  float n=mix(n0,n1,blend);
   gl_FragColor=vec4(vec3(clamp(n,0.0,1.0)),1.0);
 }`;
 
