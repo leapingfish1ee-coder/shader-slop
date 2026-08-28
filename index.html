@@ -8,15 +8,18 @@
 *{box-sizing:border-box}
 html,body{margin:0;width:100%;height:100%;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#0b0b0b;color:#f2f2f2}
 body{overflow:hidden}
-.panel{position:fixed;top:20px;z-index:2;width:200px;padding:16px;border:1px solid #2a2a2a;border-radius:12px;background:#151515;box-shadow:0 12px 32px #0008}
+.panel{position:fixed;top:20px;z-index:2;width:220px;padding:16px;border:1px solid #2a2a2a;border-radius:12px;background:#151515;box-shadow:0 12px 32px #0008}
 #shader-list{left:20px}
 #parameter-list{right:20px}
 h1{margin:0 0 12px;font-size:14px;font-weight:600}
 ul{margin:0;padding:0;list-style:none}
+li+li{margin-top:14px}
 button,select{width:100%;padding:10px 12px;border:0;border-radius:8px;background:#222;color:#ddd;font:inherit}
 button{text-align:left;cursor:pointer}
 button[aria-current="true"]{background:#333;color:#fff}
-label{display:block;margin:0 0 7px;font-size:12px;color:#aaa}
+.param-head{display:flex;justify-content:space-between;gap:12px;margin:0 0 7px;font-size:12px;color:#aaa}
+output{color:#ddd;font-variant-numeric:tabular-nums}
+input[type="range"]{width:100%;margin:0;accent-color:#888}
 #shader{position:fixed;top:50%;left:50%;width:min(72vmin,720px);aspect-ratio:1;transform:translate(-50%,-50%);display:block;background:#000}
 </style>
 </head>
@@ -31,7 +34,7 @@ label{display:block;margin:0 0 7px;font-size:12px;color:#aaa}
 <h1>Parameters</h1>
 <ul>
 <li>
-<label for="noise-type">Noise Type</label>
+<label class="param-head" for="noise-type"><span>Noise Type</span></label>
 <select id="noise-type">
 <option value="0">Value Noise</option>
 <option value="1">Perlin Noise</option>
@@ -39,6 +42,26 @@ label{display:block;margin:0 0 7px;font-size:12px;color:#aaa}
 <option value="3">Worley Noise</option>
 <option value="4">White Noise</option>
 </select>
+</li>
+<li>
+<label class="param-head" for="angular-scale"><span>Angular Scale</span><output id="angular-scale-value">3.50</output></label>
+<input id="angular-scale" type="range" min="0.1" max="10" step="0.05" value="3.5">
+</li>
+<li>
+<label class="param-head" for="radial-scale"><span>Radial Scale</span><output id="radial-scale-value">12.00</output></label>
+<input id="radial-scale" type="range" min="0.5" max="30" step="0.1" value="12">
+</li>
+<li>
+<label class="param-head" for="radial-skew"><span>Radial Skew</span><output id="radial-skew-value">0.618</output></label>
+<input id="radial-skew" type="range" min="-2" max="2" step="0.001" value="0.618">
+</li>
+<li>
+<label class="param-head" for="speed"><span>Speed</span><output id="speed-value">1.35</output></label>
+<input id="speed" type="range" min="-5" max="5" step="0.05" value="1.35">
+</li>
+<li>
+<label class="param-head" for="loop-length"><span>Loop Length</span><output id="loop-length-value">8.00</output></label>
+<input id="loop-length" type="range" min="0.5" max="20" step="0.1" value="8">
 </li>
 </ul>
 </aside>
@@ -52,6 +75,11 @@ const fragment=`precision highp float;
 uniform vec2 u_resolution;
 uniform int u_type;
 uniform float u_time;
+uniform float u_angularScale;
+uniform float u_radialScale;
+uniform float u_radialSkew;
+uniform float u_speed;
+uniform float u_loopLength;
 
 float hash21(vec2 p){
   p=fract(p*vec2(123.34,456.21));
@@ -124,8 +152,8 @@ float sampleNoise(vec2 p){
 }
 
 vec2 polarSample(float angle,float radial){
-  vec2 ring=vec2(cos(angle),sin(angle))*3.5;
-  return ring+vec2(radial,radial*0.618);
+  vec2 ring=vec2(cos(angle),sin(angle))*u_angularScale;
+  return ring+vec2(radial,radial*u_radialSkew);
 }
 
 void main(){
@@ -133,10 +161,11 @@ void main(){
   vec2 centered=uv*2.0-1.0;
   float radius=length(centered);
   float angle=atan(centered.y,centered.x);
-  float loopLength=8.0;
-  float phase=mod(u_time*1.35,loopLength);
+  float loopLength=max(u_loopLength,0.001);
+  float phase=mod(u_time*u_speed,loopLength);
+  if(phase<0.0)phase+=loopLength;
   float blend=smoothstep(0.0,1.0,phase/loopLength);
-  float radial=radius*12.0;
+  float radial=radius*u_radialScale;
   vec2 p0=polarSample(angle,radial+phase);
   vec2 p1=polarSample(angle,radial+phase-loopLength);
   float n=mix(sampleNoise(p0),sampleNoise(p1),blend);
@@ -163,19 +192,52 @@ const position=gl.getAttribLocation(program,'a_position');
 gl.enableVertexAttribArray(position);
 gl.vertexAttribPointer(position,2,gl.FLOAT,false,0,0);
 
-const resolution=gl.getUniformLocation(program,'u_resolution');
-const typeUniform=gl.getUniformLocation(program,'u_type');
-const timeUniform=gl.getUniformLocation(program,'u_time');
-const typeSelect=document.getElementById('noise-type');
+const uniforms={
+  resolution:gl.getUniformLocation(program,'u_resolution'),
+  type:gl.getUniformLocation(program,'u_type'),
+  time:gl.getUniformLocation(program,'u_time'),
+  angularScale:gl.getUniformLocation(program,'u_angularScale'),
+  radialScale:gl.getUniformLocation(program,'u_radialScale'),
+  radialSkew:gl.getUniformLocation(program,'u_radialSkew'),
+  speed:gl.getUniformLocation(program,'u_speed'),
+  loopLength:gl.getUniformLocation(program,'u_loopLength')
+};
+const controls={
+  type:document.getElementById('noise-type'),
+  angularScale:document.getElementById('angular-scale'),
+  radialScale:document.getElementById('radial-scale'),
+  radialSkew:document.getElementById('radial-skew'),
+  speed:document.getElementById('speed'),
+  loopLength:document.getElementById('loop-length')
+};
+const outputs={
+  angularScale:document.getElementById('angular-scale-value'),
+  radialScale:document.getElementById('radial-scale-value'),
+  radialSkew:document.getElementById('radial-skew-value'),
+  speed:document.getElementById('speed-value'),
+  loopLength:document.getElementById('loop-length-value')
+};
+
+for(const key of Object.keys(outputs)){
+  controls[key].addEventListener('input',()=>{
+    const digits=key==='radialSkew'?3:2;
+    outputs[key].value=Number(controls[key].value).toFixed(digits);
+  });
+}
 
 function render(time=0){
   const dpr=window.devicePixelRatio||1;
   const size=Math.round(canvas.getBoundingClientRect().width*dpr);
   if(canvas.width!==size||canvas.height!==size){canvas.width=size;canvas.height=size;}
   gl.viewport(0,0,canvas.width,canvas.height);
-  gl.uniform2f(resolution,canvas.width,canvas.height);
-  gl.uniform1i(typeUniform,Number(typeSelect.value));
-  gl.uniform1f(timeUniform,time*0.001);
+  gl.uniform2f(uniforms.resolution,canvas.width,canvas.height);
+  gl.uniform1i(uniforms.type,Number(controls.type.value));
+  gl.uniform1f(uniforms.time,time*0.001);
+  gl.uniform1f(uniforms.angularScale,Number(controls.angularScale.value));
+  gl.uniform1f(uniforms.radialScale,Number(controls.radialScale.value));
+  gl.uniform1f(uniforms.radialSkew,Number(controls.radialSkew.value));
+  gl.uniform1f(uniforms.speed,Number(controls.speed.value));
+  gl.uniform1f(uniforms.loopLength,Number(controls.loopLength.value));
   gl.drawArrays(gl.TRIANGLES,0,6);
   requestAnimationFrame(render);
 }
