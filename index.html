@@ -12,13 +12,15 @@ body{overflow:hidden}
 #shader-list{left:20px;width:220px}
 #parameter-list{right:20px}
 h1{margin:0 0 10px;font-size:14px;font-weight:600}
+h2{margin:0 0 7px;font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#777}
 ul{margin:0;padding:0;list-style:none}
-#parameter-list li+li{margin-top:7px}
+.param-group+.param-group{margin-top:14px}
+.param-group li+li{margin-top:7px}
 button,select,input[type="number"]{border:0;border-radius:7px;background:#222;color:#ddd;font:inherit}
 button,select{padding:8px 10px}
 button{width:100%;text-align:left;cursor:pointer}
 button[aria-current="true"]{background:#333;color:#fff}
-#reset-parameters{margin-top:10px;text-align:center}
+#reset-parameters{margin-top:12px;text-align:center}
 .param-row{display:grid;grid-template-columns:94px 62px minmax(88px,1fr);align-items:center;gap:7px;min-height:28px}
 .param-row>span{font-size:12px;color:#aaa;white-space:nowrap}
 .param-row select{grid-column:2/4;width:100%;min-width:0}
@@ -35,6 +37,8 @@ button[aria-current="true"]{background:#333;color:#fff}
 </aside>
 <aside id="parameter-list" class="panel">
 <h1>Parameters</h1>
+<section class="param-group">
+<h2>Noise</h2>
 <ul>
 <li class="param-row"><span>Noise Type</span><select id="noise-type"><option value="0">Value Noise</option><option value="1">Perlin Noise</option><option value="2">Simplex Noise</option><option value="3">Worley Noise</option><option value="4">White Noise</option></select></li>
 <li class="param-row"><span>Frequency</span><input id="frequency-number" type="number" min="0.01" max="32" step="0.01" value="1"><input id="frequency" type="range" min="0.01" max="32" step="0.01" value="1"></li>
@@ -45,17 +49,39 @@ button[aria-current="true"]{background:#333;color:#fff}
 <li class="param-row"><span>Lacunarity</span><input id="lacunarity-number" type="number" min="1" max="8" step="0.01" value="2"><input id="lacunarity" type="range" min="1" max="8" step="0.01" value="2"></li>
 <li class="param-row"><span>Gain</span><input id="gain-number" type="number" min="0" max="1" step="0.01" value="0.5"><input id="gain" type="range" min="0" max="1" step="0.01" value="0.5"></li>
 <li class="param-row"><span>Worley Jitter</span><input id="jitter-number" type="number" min="0" max="2" step="0.01" value="1"><input id="jitter" type="range" min="0" max="2" step="0.01" value="1"></li>
+</ul>
+</section>
+<section class="param-group">
+<h2>Polar Mapping</h2>
+<ul>
 <li class="param-row"><span>Angular Scale</span><input id="angular-scale-number" type="number" min="0.1" max="20" step="0.01" value="3.5"><input id="angular-scale" type="range" min="0.1" max="20" step="0.01" value="3.5"></li>
 <li class="param-row"><span>Radial Scale</span><input id="radial-scale-number" type="number" min="0.1" max="60" step="0.01" value="12"><input id="radial-scale" type="range" min="0.1" max="60" step="0.01" value="12"></li>
 <li class="param-row"><span>Radial Skew</span><input id="radial-skew-number" type="number" min="-8" max="8" step="0.001" value="0.618"><input id="radial-skew" type="range" min="-8" max="8" step="0.001" value="0.618"></li>
 <li class="param-row"><span>Speed</span><input id="speed-number" type="number" min="-20" max="20" step="0.01" value="1.35"><input id="speed" type="range" min="-20" max="20" step="0.01" value="1.35"></li>
 <li class="param-row"><span>Loop Length</span><input id="loop-length-number" type="number" min="0.01" max="100" step="0.01" value="8"><input id="loop-length" type="range" min="0.01" max="100" step="0.01" value="8"></li>
-<li class="param-row"><span>Distortion</span><input id="distortion-number" type="number" min="0" max="4" step="0.001" value="0"><input id="distortion" type="range" min="0" max="4" step="0.001" value="0"></li>
+</ul>
+</section>
+<section class="param-group">
+<h2>Distortion</h2>
+<ul>
+<li class="param-row"><span>Amount</span><input id="distortion-number" type="number" min="0" max="4" step="0.001" value="0"><input id="distortion" type="range" min="0" max="4" step="0.001" value="0"></li>
+<li class="param-row"><span>Scale X</span><input id="distortion-scale-x-number" type="number" min="0.001" max="8" step="0.001" value="0.37"><input id="distortion-scale-x" type="range" min="0.001" max="8" step="0.001" value="0.37"></li>
+<li class="param-row"><span>Scale Y</span><input id="distortion-scale-y-number" type="number" min="0.001" max="8" step="0.001" value="0.37"><input id="distortion-scale-y" type="range" min="0.001" max="8" step="0.001" value="0.37"></li>
+<li class="param-row"><span>X Seed X</span><input id="distortion-x-seed-x-number" type="number" min="-100" max="100" step="0.01" value="17.13"><input id="distortion-x-seed-x" type="range" min="-100" max="100" step="0.01" value="17.13"></li>
+<li class="param-row"><span>X Seed Y</span><input id="distortion-x-seed-y-number" type="number" min="-100" max="100" step="0.01" value="3.71"><input id="distortion-x-seed-y" type="range" min="-100" max="100" step="0.01" value="3.71"></li>
+<li class="param-row"><span>Y Seed X</span><input id="distortion-y-seed-x-number" type="number" min="-100" max="100" step="0.01" value="-5.43"><input id="distortion-y-seed-x" type="range" min="-100" max="100" step="0.01" value="-5.43"></li>
+<li class="param-row"><span>Y Seed Y</span><input id="distortion-y-seed-y-number" type="number" min="-100" max="100" step="0.01" value="11.29"><input id="distortion-y-seed-y" type="range" min="-100" max="100" step="0.01" value="11.29"></li>
+</ul>
+</section>
+<section class="param-group">
+<h2>Ring Mask</h2>
+<ul>
 <li class="param-row"><span>Ring Radius</span><input id="ring-radius-number" type="number" min="0" max="1.4" step="0.001" value="0.63"><input id="ring-radius" type="range" min="0" max="1.4" step="0.001" value="0.63"></li>
 <li class="param-row"><span>Ring Width</span><input id="ring-width-number" type="number" min="0.001" max="1.4" step="0.001" value="0.32"><input id="ring-width" type="range" min="0.001" max="1.4" step="0.001" value="0.32"></li>
 <li class="param-row"><span>Inner Gradient</span><input id="ring-inner-gradient-number" type="number" min="0" max="0.3" step="0.001" value="0.02"><input id="ring-inner-gradient" type="range" min="0" max="0.3" step="0.001" value="0.02"></li>
 <li class="param-row"><span>Outer Gradient</span><input id="ring-outer-gradient-number" type="number" min="0" max="0.3" step="0.001" value="0.02"><input id="ring-outer-gradient" type="range" min="0" max="0.3" step="0.001" value="0.02"></li>
 </ul>
+</section>
 <button id="reset-parameters" type="button">Reset Defaults</button>
 </aside>
 <canvas id="shader" aria-label="Shader container"></canvas>
@@ -82,6 +108,12 @@ uniform float u_lacunarity;
 uniform float u_gain;
 uniform float u_jitter;
 uniform float u_distortion;
+uniform float u_distortionScaleX;
+uniform float u_distortionScaleY;
+uniform float u_distortionXSeedX;
+uniform float u_distortionXSeedY;
+uniform float u_distortionYSeedX;
+uniform float u_distortionYSeedY;
 uniform float u_ringRadius;
 uniform float u_ringWidth;
 uniform float u_ringInnerGradient;
@@ -97,14 +129,14 @@ float simplexNoise(vec2 p){const float K1=0.366025404;const float K2=0.211324865
 float worleyNoise(vec2 p){vec2 i=floor(p),f=fract(p);float d=1.0;for(int y=-1;y<=1;y++){for(int x=-1;x<=1;x++){vec2 g=vec2(float(x),float(y));vec2 point=vec2(0.5)+(hash22(i+g)-0.5)*u_jitter;vec2 r=g+point-f;d=min(d,dot(r,r));}}return clamp(sqrt(d),0.0,1.0);}
 float baseNoise(vec2 p){if(u_type==0)return valueNoise(p);if(u_type==1)return perlinNoise(p);if(u_type==2)return simplexNoise(p);if(u_type==3)return worleyNoise(p);return hash21(floor(p*4.0));}
 float sampleNoise(vec2 p){vec2 q=(p+vec2(u_seed,u_seed*0.754877666))*u_frequency*vec2(u_noiseScaleX,u_noiseScaleY);float sum=0.0,weight=0.0,amplitude=1.0;for(int i=0;i<8;i++){if(float(i)<u_octaves){sum+=baseNoise(q)*amplitude;weight+=amplitude;}q*=u_lacunarity;amplitude*=u_gain;}return weight>0.0?sum/weight:0.0;}
-vec2 distortPoint(vec2 p){float dx=valueNoise(p*0.37+vec2(17.13,3.71))*2.0-1.0;float dy=valueNoise(p*0.37+vec2(-5.43,11.29))*2.0-1.0;return p+vec2(dx,dy)*u_distortion;}
+vec2 distortPoint(vec2 p){vec2 q=p*vec2(u_distortionScaleX,u_distortionScaleY);float dx=valueNoise(q+vec2(u_distortionXSeedX,u_distortionXSeedY))*2.0-1.0;float dy=valueNoise(q+vec2(u_distortionYSeedX,u_distortionYSeedY))*2.0-1.0;return p+vec2(dx,dy)*u_distortion;}
 float periodicAngularNoise(vec2 p,float period){float x=mod(p.x,period);if(x<0.0)x+=period;float t=x/period;t=t*t*(3.0-2.0*t);float a=sampleNoise(distortPoint(vec2(x,p.y)));float b=sampleNoise(distortPoint(vec2(x-period,p.y)));return mix(a,b,t);}
 void main(){vec2 uv=gl_FragCoord.xy/u_resolution.xy;vec2 centered=uv*2.0-1.0;float radius=length(centered);float angle=atan(centered.y,centered.x);float angularPeriod=max(u_angularScale,0.001);float angle01=(angle+PI)/TAU;float loopLength=max(u_loopLength,0.001);float phase=mod(u_time*u_speed,loopLength);if(phase<0.0)phase+=loopLength;float blend=smoothstep(0.0,1.0,phase/loopLength);float radial=radius*u_radialScale;float radial0=radial+phase;float radial1=radial+phase-loopLength;vec2 p0=vec2(angle01*angularPeriod+radial0*u_radialSkew,radial0);vec2 p1=vec2(angle01*angularPeriod+radial1*u_radialSkew,radial1);float n0=periodicAngularNoise(p0,angularPeriod);float n1=periodicAngularNoise(p1,angularPeriod);float n=clamp(mix(n0,n1,blend),0.0,1.0);float halfWidth=max(u_ringWidth*0.5,0.0005);float innerEdge=max(u_ringRadius-halfWidth,0.0);float outerEdge=u_ringRadius+halfWidth;float inner=u_ringInnerGradient<=0.0?step(innerEdge,radius):smoothstep(innerEdge-u_ringInnerGradient,innerEdge,radius);float outer=u_ringOuterGradient<=0.0?1.0-step(outerEdge,radius):1.0-smoothstep(outerEdge,outerEdge+u_ringOuterGradient,radius);float ring=inner*outer;gl_FragColor=vec4(1.0,1.0,1.0,n*ring);}`;
 function compile(type,source){const shader=gl.createShader(type);gl.shaderSource(shader,source);gl.compileShader(shader);return shader;}
 const program=gl.createProgram();gl.attachShader(program,compile(gl.VERTEX_SHADER,vertex));gl.attachShader(program,compile(gl.FRAGMENT_SHADER,fragment));gl.linkProgram(program);gl.useProgram(program);
 const buffer=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,buffer);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,-1,1,1,-1,1,1]),gl.STATIC_DRAW);const position=gl.getAttribLocation(program,'a_position');gl.enableVertexAttribArray(position);gl.vertexAttribPointer(position,2,gl.FLOAT,false,0,0);
-const names=['frequency','noiseScaleX','noiseScaleY','seed','octaves','lacunarity','gain','jitter','angularScale','radialScale','radialSkew','speed','loopLength','distortion','ringRadius','ringWidth','ringInnerGradient','ringOuterGradient'];
-const ids={noiseScaleX:'noise-scale-x',noiseScaleY:'noise-scale-y',angularScale:'angular-scale',radialScale:'radial-scale',radialSkew:'radial-skew',loopLength:'loop-length',ringRadius:'ring-radius',ringWidth:'ring-width',ringInnerGradient:'ring-inner-gradient',ringOuterGradient:'ring-outer-gradient'};
+const names=['frequency','noiseScaleX','noiseScaleY','seed','octaves','lacunarity','gain','jitter','angularScale','radialScale','radialSkew','speed','loopLength','distortion','distortionScaleX','distortionScaleY','distortionXSeedX','distortionXSeedY','distortionYSeedX','distortionYSeedY','ringRadius','ringWidth','ringInnerGradient','ringOuterGradient'];
+const ids={noiseScaleX:'noise-scale-x',noiseScaleY:'noise-scale-y',angularScale:'angular-scale',radialScale:'radial-scale',radialSkew:'radial-skew',loopLength:'loop-length',distortionScaleX:'distortion-scale-x',distortionScaleY:'distortion-scale-y',distortionXSeedX:'distortion-x-seed-x',distortionXSeedY:'distortion-x-seed-y',distortionYSeedX:'distortion-y-seed-x',distortionYSeedY:'distortion-y-seed-y',ringRadius:'ring-radius',ringWidth:'ring-width',ringInnerGradient:'ring-inner-gradient',ringOuterGradient:'ring-outer-gradient'};
 const uniforms={resolution:gl.getUniformLocation(program,'u_resolution'),type:gl.getUniformLocation(program,'u_type'),time:gl.getUniformLocation(program,'u_time')};
 for(const key of names)uniforms[key]=gl.getUniformLocation(program,'u_'+key);
 const controls={type:document.getElementById('noise-type')};
