@@ -123,6 +123,11 @@ float sampleNoise(vec2 p){
   return hash21(floor(p*4.0));
 }
 
+vec2 polarSample(float angle,float radial){
+  vec2 ring=vec2(cos(angle),sin(angle))*3.5;
+  return ring+vec2(radial,radial*0.618);
+}
+
 void main(){
   vec2 uv=gl_FragCoord.xy/u_resolution.xy;
   vec2 centered=uv*2.0-1.0;
@@ -131,8 +136,9 @@ void main(){
   float loopLength=8.0;
   float phase=mod(u_time*1.35,loopLength);
   float blend=smoothstep(0.0,1.0,phase/loopLength);
-  vec2 p0=vec2(angle*2.5,radius*12.0+phase);
-  vec2 p1=vec2(angle*2.5,radius*12.0+phase-loopLength);
+  float radial=radius*12.0;
+  vec2 p0=polarSample(angle,radial+phase);
+  vec2 p1=polarSample(angle,radial+phase-loopLength);
   float n=mix(sampleNoise(p0),sampleNoise(p1),blend);
   gl_FragColor=vec4(vec3(clamp(n,0.0,1.0)),1.0);
 }`;
