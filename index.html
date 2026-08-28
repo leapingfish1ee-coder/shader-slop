@@ -115,18 +115,25 @@ float worleyNoise(vec2 p){
   return clamp(sqrt(d),0.0,1.0);
 }
 
+float sampleNoise(vec2 p){
+  if(u_type==0)return valueNoise(p);
+  if(u_type==1)return perlinNoise(p);
+  if(u_type==2)return simplexNoise(p);
+  if(u_type==3)return worleyNoise(p);
+  return hash21(floor(p*4.0));
+}
+
 void main(){
   vec2 uv=gl_FragCoord.xy/u_resolution.xy;
   vec2 centered=uv*2.0-1.0;
   float radius=length(centered);
-  float angle=atan(centered.y,centered.x)+u_time*0.45;
-  vec2 p=vec2(angle*2.5,radius*12.0);
-  float n=0.0;
-  if(u_type==0)n=valueNoise(p);
-  else if(u_type==1)n=perlinNoise(p);
-  else if(u_type==2)n=simplexNoise(p);
-  else if(u_type==3)n=worleyNoise(p);
-  else n=hash21(floor(p*4.0));
+  float angle=atan(centered.y,centered.x);
+  float loopLength=8.0;
+  float phase=mod(u_time*1.35,loopLength);
+  float blend=smoothstep(0.0,1.0,phase/loopLength);
+  vec2 p0=vec2(angle*2.5,radius*12.0+phase);
+  vec2 p1=vec2(angle*2.5,radius*12.0+phase-loopLength);
+  float n=mix(sampleNoise(p0),sampleNoise(p1),blend);
   gl_FragColor=vec4(vec3(clamp(n,0.0,1.0)),1.0);
 }`;
 
