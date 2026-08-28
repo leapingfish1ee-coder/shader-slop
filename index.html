@@ -74,6 +74,14 @@ button[aria-current="true"]{background:#333;color:#fff}
 </ul>
 </section>
 <section class="param-group">
+<h2>Hex Distortion</h2>
+<ul>
+<li class="param-row"><span>Hex Amount</span><input id="hex-distortion-number" type="number" min="0" max="0.2" step="0.001" value="0.025"><input id="hex-distortion" type="range" min="0" max="0.2" step="0.001" value="0.025"></li>
+<li class="param-row"><span>Hex Scale</span><input id="hex-scale-number" type="number" min="0.05" max="8" step="0.01" value="0.85"><input id="hex-scale" type="range" min="0.05" max="8" step="0.01" value="0.85"></li>
+<li class="param-row"><span>Edge Width</span><input id="hex-edge-width-number" type="number" min="0.001" max="0.3" step="0.001" value="0.06"><input id="hex-edge-width" type="range" min="0.001" max="0.3" step="0.001" value="0.06"></li>
+</ul>
+</section>
+<section class="param-group">
 <h2>Ring Mask</h2>
 <ul>
 <li class="param-row"><span>Ring Radius</span><input id="ring-radius-number" type="number" min="0" max="1.4" step="0.001" value="0.63"><input id="ring-radius" type="range" min="0" max="1.4" step="0.001" value="0.63"></li>
@@ -114,6 +122,9 @@ uniform float u_distortionXSeedX;
 uniform float u_distortionXSeedY;
 uniform float u_distortionYSeedX;
 uniform float u_distortionYSeedY;
+uniform float u_hexDistortion;
+uniform float u_hexScale;
+uniform float u_hexEdgeWidth;
 uniform float u_ringRadius;
 uniform float u_ringWidth;
 uniform float u_ringInnerGradient;
@@ -131,14 +142,14 @@ float baseNoise(vec2 p){if(u_type==0)return valueNoise(p);if(u_type==1)return pe
 float sampleNoise(vec2 p){vec2 q=(p+vec2(u_seed,u_seed*0.754877666))*u_frequency*vec2(u_noiseScaleX,u_noiseScaleY);float sum=0.0,weight=0.0,amplitude=1.0;for(int i=0;i<8;i++){if(float(i)<u_octaves){sum+=baseNoise(q)*amplitude;weight+=amplitude;}q*=u_lacunarity;amplitude*=u_gain;}return weight>0.0?sum/weight:0.0;}
 vec2 distortPoint(vec2 p){vec2 q=p*vec2(u_distortionScaleX,u_distortionScaleY);float dx=valueNoise(q+vec2(u_distortionXSeedX,u_distortionXSeedY))*2.0-1.0;float dy=valueNoise(q+vec2(u_distortionYSeedX,u_distortionYSeedY))*2.0-1.0;return p+vec2(dx,dy)*u_distortion;}
 vec2 hexCellLocal(vec2 p){vec2 size=vec2(1.0,1.732050808);vec2 halfSize=size*0.5;vec2 a=mod(p,size)-halfSize;vec2 b=mod(p-halfSize,size)-halfSize;return dot(a,a)<dot(b,b)?a:b;}
-vec2 hexDistortPoint(vec2 p){vec2 scaled=p*0.85;vec2 cell=hexCellLocal(scaled);float distanceFromCenter=length(cell);float edge=smoothstep(0.30,0.56,distanceFromCenter);vec2 direction=cell/(distanceFromCenter+0.0001);return p+direction*edge*0.18;}
+vec2 hexDistortPoint(vec2 p){vec2 cell=hexCellLocal(p*u_hexScale);float d0=abs(cell.x);float d1=abs(dot(cell,vec2(0.5,0.866025404)));float d2=abs(dot(cell,vec2(0.5,-0.866025404)));float m=max(d0,max(d1,d2));float edgeDistance=max(0.5-m,0.0);float edge=1.0-smoothstep(0.0,max(u_hexEdgeWidth,0.0001),edgeDistance);vec2 normal;if(d0>=d1&&d0>=d2){normal=vec2(sign(cell.x),0.0);}else if(d1>=d2){normal=vec2(0.5,0.866025404)*sign(dot(cell,vec2(0.5,0.866025404)));}else{normal=vec2(0.5,-0.866025404)*sign(dot(cell,vec2(0.5,-0.866025404)));}return p+normal*edge*u_hexDistortion;}
 float periodicAngularNoise(vec2 p,float period){float x=mod(p.x,period);if(x<0.0)x+=period;float t=x/period;t=t*t*(3.0-2.0*t);vec2 aPoint=hexDistortPoint(distortPoint(vec2(x,p.y)));vec2 bPoint=hexDistortPoint(distortPoint(vec2(x-period,p.y)));float a=sampleNoise(aPoint);float b=sampleNoise(bPoint);return mix(a,b,t);}
 void main(){vec2 uv=gl_FragCoord.xy/u_resolution.xy;vec2 centered=uv*2.0-1.0;float radius=length(centered);float angle=atan(centered.y,centered.x);float angularPeriod=max(u_angularScale,0.001);float angle01=(angle+PI)/TAU;float loopLength=max(u_loopLength,0.001);float phase=mod(u_time*u_speed,loopLength);if(phase<0.0)phase+=loopLength;float blend=smoothstep(0.0,1.0,phase/loopLength);float radial=radius*u_radialScale;float radial0=radial+phase;float radial1=radial+phase-loopLength;vec2 p0=vec2(angle01*angularPeriod+radial0*u_radialSkew,radial0);vec2 p1=vec2(angle01*angularPeriod+radial1*u_radialSkew,radial1);float n0=periodicAngularNoise(p0,angularPeriod);float n1=periodicAngularNoise(p1,angularPeriod);float n=clamp(mix(n0,n1,blend),0.0,1.0);float halfWidth=max(u_ringWidth*0.5,0.0005);float innerEdge=max(u_ringRadius-halfWidth,0.0);float outerEdge=u_ringRadius+halfWidth;float inner=u_ringInnerGradient<=0.0?step(innerEdge,radius):smoothstep(innerEdge-u_ringInnerGradient,innerEdge,radius);float outer=u_ringOuterGradient<=0.0?1.0-step(outerEdge,radius):1.0-smoothstep(outerEdge,outerEdge+u_ringOuterGradient,radius);float ring=inner*outer;gl_FragColor=vec4(1.0,1.0,1.0,n*ring);}`;
 function compile(type,source){const shader=gl.createShader(type);gl.shaderSource(shader,source);gl.compileShader(shader);return shader;}
 const program=gl.createProgram();gl.attachShader(program,compile(gl.VERTEX_SHADER,vertex));gl.attachShader(program,compile(gl.FRAGMENT_SHADER,fragment));gl.linkProgram(program);gl.useProgram(program);
 const buffer=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,buffer);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,-1,1,1,-1,1,1]),gl.STATIC_DRAW);const position=gl.getAttribLocation(program,'a_position');gl.enableVertexAttribArray(position);gl.vertexAttribPointer(position,2,gl.FLOAT,false,0,0);
-const names=['frequency','noiseScaleX','noiseScaleY','seed','octaves','lacunarity','gain','jitter','angularScale','radialScale','radialSkew','speed','loopLength','distortion','distortionScaleX','distortionScaleY','distortionXSeedX','distortionXSeedY','distortionYSeedX','distortionYSeedY','ringRadius','ringWidth','ringInnerGradient','ringOuterGradient'];
-const ids={noiseScaleX:'noise-scale-x',noiseScaleY:'noise-scale-y',angularScale:'angular-scale',radialScale:'radial-scale',radialSkew:'radial-skew',loopLength:'loop-length',distortionScaleX:'distortion-scale-x',distortionScaleY:'distortion-scale-y',distortionXSeedX:'distortion-x-seed-x',distortionXSeedY:'distortion-x-seed-y',distortionYSeedX:'distortion-y-seed-x',distortionYSeedY:'distortion-y-seed-y',ringRadius:'ring-radius',ringWidth:'ring-width',ringInnerGradient:'ring-inner-gradient',ringOuterGradient:'ring-outer-gradient'};
+const names=['frequency','noiseScaleX','noiseScaleY','seed','octaves','lacunarity','gain','jitter','angularScale','radialScale','radialSkew','speed','loopLength','distortion','distortionScaleX','distortionScaleY','distortionXSeedX','distortionXSeedY','distortionYSeedX','distortionYSeedY','hexDistortion','hexScale','hexEdgeWidth','ringRadius','ringWidth','ringInnerGradient','ringOuterGradient'];
+const ids={noiseScaleX:'noise-scale-x',noiseScaleY:'noise-scale-y',angularScale:'angular-scale',radialScale:'radial-scale',radialSkew:'radial-skew',loopLength:'loop-length',distortionScaleX:'distortion-scale-x',distortionScaleY:'distortion-scale-y',distortionXSeedX:'distortion-x-seed-x',distortionXSeedY:'distortion-x-seed-y',distortionYSeedX:'distortion-y-seed-x',distortionYSeedY:'distortion-y-seed-y',hexDistortion:'hex-distortion',hexScale:'hex-scale',hexEdgeWidth:'hex-edge-width',ringRadius:'ring-radius',ringWidth:'ring-width',ringInnerGradient:'ring-inner-gradient',ringOuterGradient:'ring-outer-gradient'};
 const uniforms={resolution:gl.getUniformLocation(program,'u_resolution'),type:gl.getUniformLocation(program,'u_type'),time:gl.getUniformLocation(program,'u_time')};
 for(const key of names)uniforms[key]=gl.getUniformLocation(program,'u_'+key);
 const controls={type:document.getElementById('noise-type')};
