@@ -51,6 +51,7 @@ void main(){gl_Position=vec4(a_position,0.0,1.0);}`;
 const fragment=`precision highp float;
 uniform vec2 u_resolution;
 uniform int u_type;
+uniform float u_time;
 
 float hash21(vec2 p){
   p=fract(p*vec2(123.34,456.21));
@@ -116,13 +117,16 @@ float worleyNoise(vec2 p){
 
 void main(){
   vec2 uv=gl_FragCoord.xy/u_resolution.xy;
-  vec2 p=uv*7.0;
+  vec2 centered=uv*2.0-1.0;
+  float radius=length(centered);
+  float angle=atan(centered.y,centered.x)+u_time*0.45;
+  vec2 p=vec2(angle*2.5,radius*12.0);
   float n=0.0;
   if(u_type==0)n=valueNoise(p);
   else if(u_type==1)n=perlinNoise(p);
   else if(u_type==2)n=simplexNoise(p);
   else if(u_type==3)n=worleyNoise(p);
-  else n=hash21(floor(gl_FragCoord.xy));
+  else n=hash21(floor(p*4.0));
   gl_FragColor=vec4(vec3(clamp(n,0.0,1.0)),1.0);
 }`;
 
@@ -148,21 +152,22 @@ gl.vertexAttribPointer(position,2,gl.FLOAT,false,0,0);
 
 const resolution=gl.getUniformLocation(program,'u_resolution');
 const typeUniform=gl.getUniformLocation(program,'u_type');
+const timeUniform=gl.getUniformLocation(program,'u_time');
 const typeSelect=document.getElementById('noise-type');
 
-function render(){
+function render(time=0){
   const dpr=window.devicePixelRatio||1;
   const size=Math.round(canvas.getBoundingClientRect().width*dpr);
   if(canvas.width!==size||canvas.height!==size){canvas.width=size;canvas.height=size;}
   gl.viewport(0,0,canvas.width,canvas.height);
   gl.uniform2f(resolution,canvas.width,canvas.height);
   gl.uniform1i(typeUniform,Number(typeSelect.value));
+  gl.uniform1f(timeUniform,time*0.001);
   gl.drawArrays(gl.TRIANGLES,0,6);
+  requestAnimationFrame(render);
 }
 
-typeSelect.addEventListener('change',render);
-new ResizeObserver(render).observe(canvas);
-render();
+requestAnimationFrame(render);
 </script>
 </body>
 </html>
