@@ -18,6 +18,7 @@ button,select,input[type="number"]{border:0;border-radius:8px;background:#222;co
 button,select{width:100%;padding:10px 12px}
 button{text-align:left;cursor:pointer}
 button[aria-current="true"]{background:#333;color:#fff}
+#reset-parameters{margin-top:16px;text-align:center}
 .param-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 7px;font-size:12px;color:#aaa}
 .param-head input[type="number"]{width:78px;padding:5px 7px;text-align:right;font-size:12px;font-variant-numeric:tabular-nums}
 input[type="range"]{width:100%;margin:0;accent-color:#888}
@@ -47,6 +48,7 @@ input[type="range"]{width:100%;margin:0;accent-color:#888}
 <li><label class="param-head" for="speed"><span>Speed</span><input id="speed-number" type="number" min="-20" max="20" step="0.01" value="1.35"></label><input id="speed" type="range" min="-20" max="20" step="0.01" value="1.35"></li>
 <li><label class="param-head" for="loop-length"><span>Loop Length</span><input id="loop-length-number" type="number" min="0.01" max="100" step="0.01" value="8"></label><input id="loop-length" type="range" min="0.01" max="100" step="0.01" value="8"></li>
 </ul>
+<button id="reset-parameters" type="button">Reset Defaults</button>
 </aside>
 <canvas id="shader" aria-label="Shader container"></canvas>
 <script>
@@ -93,9 +95,19 @@ const uniforms={resolution:gl.getUniformLocation(program,'u_resolution'),type:gl
 for(const key of names)uniforms[key]=gl.getUniformLocation(program,'u_'+key);
 const controls={type:document.getElementById('noise-type')};
 for(const key of names){const id=ids[key]||key;controls[key]={range:document.getElementById(id),number:document.getElementById(id+'-number')};}
+const storageKey='shader-slop:noise-parameters';
+const defaults={type:controls.type.value};
+for(const key of names)defaults[key]=controls[key].range.defaultValue;
 function clampValue(input,value){const min=Number(input.min),max=Number(input.max);return Math.min(max,Math.max(min,value));}
-for(const key of names){const c=controls[key];c.range.addEventListener('input',()=>c.number.value=c.range.value);c.number.addEventListener('input',()=>{const v=Number(c.number.value);if(Number.isFinite(v))c.range.value=clampValue(c.range,v);});c.number.addEventListener('change',()=>{let v=Number(c.number.value);if(!Number.isFinite(v))v=Number(c.range.value);v=clampValue(c.number,v);c.number.value=v;c.range.value=v;});}
+function setValue(key,value){const c=controls[key];let v=Number(value);if(!Number.isFinite(v))v=Number(defaults[key]);v=clampValue(c.number,v);c.number.value=v;c.range.value=clampValue(c.range,v);}
+function snapshot(){const state={type:controls.type.value};for(const key of names)state[key]=controls[key].number.value;return state;}
+function save(){localStorage.setItem(storageKey,JSON.stringify(snapshot()));}
+function load(){try{const state=JSON.parse(localStorage.getItem(storageKey));if(!state)return;if(state.type!==undefined)controls.type.value=String(state.type);for(const key of names)if(state[key]!==undefined)setValue(key,state[key]);}catch{localStorage.removeItem(storageKey);}}
+for(const key of names){const c=controls[key];c.range.addEventListener('input',()=>{c.number.value=c.range.value;save();});c.number.addEventListener('input',()=>{const v=Number(c.number.value);if(Number.isFinite(v)){c.range.value=clampValue(c.range,v);save();}});c.number.addEventListener('change',()=>{let v=Number(c.number.value);if(!Number.isFinite(v))v=Number(c.range.value);setValue(key,v);save();});}
+controls.type.addEventListener('change',save);
+document.getElementById('reset-parameters').addEventListener('click',()=>{localStorage.removeItem(storageKey);controls.type.value=defaults.type;for(const key of names)setValue(key,defaults[key]);});
 function value(key){const v=Number(controls[key].number.value);return Number.isFinite(v)?v:Number(controls[key].range.value);}
+load();
 function render(time=0){const dpr=window.devicePixelRatio||1;const size=Math.round(canvas.getBoundingClientRect().width*dpr);if(canvas.width!==size||canvas.height!==size){canvas.width=size;canvas.height=size;}gl.viewport(0,0,canvas.width,canvas.height);gl.uniform2f(uniforms.resolution,canvas.width,canvas.height);gl.uniform1i(uniforms.type,Number(controls.type.value));gl.uniform1f(uniforms.time,time*0.001);for(const key of names)gl.uniform1f(uniforms[key],value(key));gl.drawArrays(gl.TRIANGLES,0,6);requestAnimationFrame(render);}
 requestAnimationFrame(render);
 </script>
