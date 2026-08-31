@@ -31,7 +31,7 @@ button[aria-current="true"]{background:#333;color:#fff}
 </style>
 </head>
 <body>
-<aside id="shader-list" class="panel"><h1>Shaders</h1><ul><li><button type="button" aria-current="true">01 科技六边形护盾</button></li><li><button type="button">02 Shader</button></li></ul></aside>
+<aside id="shader-list" class="panel"><h1>Shaders</h1><ul><li><button type="button" data-shader="1" aria-current="true">01 科技六边形护盾</button></li><li><button type="button" data-shader="2">02 Shader</button></li></ul></aside>
 <aside id="parameter-list" class="panel">
 <h1>Parameters</h1>
 <section class="param-group"><h2>Noise</h2><ul>
@@ -78,6 +78,11 @@ button[aria-current="true"]{background:#333;color:#fff}
 <script>
 const canvas=document.getElementById('shader');
 const gl=canvas.getContext('webgl',{alpha:true,premultipliedAlpha:false});
+const shaderButtons=[...document.querySelectorAll('#shader-list button[data-shader]')];
+const parameterList=document.getElementById('parameter-list');
+let activeShader=1;
+function selectShader(id){activeShader=id;for(const button of shaderButtons){if(Number(button.dataset.shader)===id)button.setAttribute('aria-current','true');else button.removeAttribute('aria-current');}parameterList.hidden=id!==1;if(id!==1){gl.clearColor(0.0,0.0,0.0,0.0);gl.clear(gl.COLOR_BUFFER_BIT);}}
+for(const button of shaderButtons)button.addEventListener('click',()=>selectShader(Number(button.dataset.shader)));
 const vertex=`attribute vec2 a_position;void main(){gl_Position=vec4(a_position,0.0,1.0);}`;
 const fragment=`precision highp float;
 uniform vec2 u_resolution;uniform int u_type;uniform float u_time;uniform float u_angularScale;uniform float u_radialScale;uniform float u_radialSkew;uniform float u_speed;uniform float u_loopLength;uniform float u_frequency;uniform float u_noiseScaleX;uniform float u_noiseScaleY;uniform float u_seed;uniform float u_octaves;uniform float u_lacunarity;uniform float u_gain;uniform float u_jitter;uniform float u_distortion;uniform float u_distortionScaleX;uniform float u_distortionScaleY;uniform float u_distortionXSeedX;uniform float u_distortionXSeedY;uniform float u_distortionYSeedX;uniform float u_distortionYSeedY;uniform float u_hexDistortion;uniform float u_hexScale;uniform float u_hexEdgeWidth;uniform float u_ringRadius;uniform float u_ringWidth;uniform float u_ringInnerGradient;uniform float u_ringOuterGradient;
@@ -114,7 +119,7 @@ for(const key of names){const c=controls[key];c.range.addEventListener('input',(
 controls.type.addEventListener('change',save);document.getElementById('reset-parameters').addEventListener('click',()=>{localStorage.removeItem(storageKey);controls.type.value=defaults.type;for(const key of names)setValue(key,defaults[key]);});
 function value(key){const v=Number(controls[key].number.value);return Number.isFinite(v)?v:Number(controls[key].range.value);}
 load();
-function render(time=0){const dpr=window.devicePixelRatio||1;const size=Math.round(canvas.getBoundingClientRect().width*dpr);if(canvas.width!==size||canvas.height!==size){canvas.width=size;canvas.height=size;}gl.viewport(0,0,canvas.width,canvas.height);gl.uniform2f(uniforms.resolution,canvas.width,canvas.height);gl.uniform1i(uniforms.type,Number(controls.type.value));gl.uniform1f(uniforms.time,time*0.001);for(const key of names)gl.uniform1f(uniforms[key],value(key));gl.drawArrays(gl.TRIANGLES,0,6);requestAnimationFrame(render);}requestAnimationFrame(render);
+function render(time=0){const dpr=window.devicePixelRatio||1;const size=Math.round(canvas.getBoundingClientRect().width*dpr);if(canvas.width!==size||canvas.height!==size){canvas.width=size;canvas.height=size;}gl.viewport(0,0,canvas.width,canvas.height);if(activeShader!==1){gl.clearColor(0.0,0.0,0.0,0.0);gl.clear(gl.COLOR_BUFFER_BIT);requestAnimationFrame(render);return;}gl.uniform2f(uniforms.resolution,canvas.width,canvas.height);gl.uniform1i(uniforms.type,Number(controls.type.value));gl.uniform1f(uniforms.time,time*0.001);for(const key of names)gl.uniform1f(uniforms[key],value(key));gl.drawArrays(gl.TRIANGLES,0,6);requestAnimationFrame(render);}requestAnimationFrame(render);
 </script>
 </body>
 </html>
