@@ -10,7 +10,7 @@ html,body{margin:0;width:100%;height:100%;font-family:system-ui,-apple-system,Bl
 body{overflow:hidden}
 .panel{position:fixed;top:20px;z-index:2;width:320px;max-height:calc(100vh - 40px);overflow:auto;padding:14px;border:1px solid #2a2a2a;border-radius:12px;background:#151515;box-shadow:0 12px 32px #0008}
 #shader-list{left:20px;width:220px}
-#parameter-list{right:20px}
+#parameter-list,#parameter-list-02{right:20px}
 h1{margin:0 0 10px;font-size:14px;font-weight:600}
 h2{margin:0 0 7px;font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#777}
 ul{margin:0;padding:0;list-style:none}
@@ -74,16 +74,23 @@ button[aria-current="true"]{background:#333;color:#fff}
 </ul></section>
 <button id="reset-parameters" type="button">Reset Defaults</button>
 </aside>
+<aside id="parameter-list-02" class="panel" hidden>
+<h1>Parameters</h1>
+<section class="param-group"><h2>Color</h2><ul>
+<li class="param-row"><span>Desaturate</span><input id="desaturate-number" type="number" min="0" max="1" step="0.01" value="0"><input id="desaturate" type="range" min="0" max="1" step="0.01" value="0"></li>
+</ul></section>
+</aside>
 <canvas id="shader" aria-label="Shader container"></canvas>
 <script>
 const canvas=document.getElementById('shader');
 const gl=canvas.getContext('webgl',{alpha:true,premultipliedAlpha:false});
 const shaderButtons=[...document.querySelectorAll('#shader-list button[data-shader]')];
 const parameterList=document.getElementById('parameter-list');
+const parameterList02=document.getElementById('parameter-list-02');
 const activeShaderStorageKey='shader-slop:active-shader';
 const savedShader=Number(localStorage.getItem(activeShaderStorageKey));
 let activeShader=savedShader===2?2:1;
-function selectShader(id){activeShader=id===2?2:1;localStorage.setItem(activeShaderStorageKey,String(activeShader));for(const button of shaderButtons){if(Number(button.dataset.shader)===activeShader)button.setAttribute('aria-current','true');else button.removeAttribute('aria-current');}parameterList.hidden=activeShader!==1;}
+function selectShader(id){activeShader=id===2?2:1;localStorage.setItem(activeShaderStorageKey,String(activeShader));for(const button of shaderButtons){if(Number(button.dataset.shader)===activeShader)button.setAttribute('aria-current','true');else button.removeAttribute('aria-current');}parameterList.hidden=activeShader!==1;parameterList02.hidden=activeShader!==2;}
 for(const button of shaderButtons)button.addEventListener('click',()=>selectShader(Number(button.dataset.shader)));
 selectShader(activeShader);
 const vertex=`attribute vec2 a_position;void main(){gl_Position=vec4(a_position,0.0,1.0);}`;
@@ -109,7 +116,8 @@ const fragment02=`precision highp float;
 uniform vec2 u_resolution;
 uniform vec2 u_textureResolution;
 uniform sampler2D u_texture;
-void main(){vec2 uv=gl_FragCoord.xy/u_resolution.xy;float canvasAspect=u_resolution.x/u_resolution.y;float textureAspect=u_textureResolution.x/u_textureResolution.y;if(textureAspect>canvasAspect){uv.x=(uv.x-0.5)*(canvasAspect/textureAspect)+0.5;}else{uv.y=(uv.y-0.5)*(textureAspect/canvasAspect)+0.5;}gl_FragColor=texture2D(u_texture,uv);}`;
+uniform float u_desaturate;
+void main(){vec2 uv=gl_FragCoord.xy/u_resolution.xy;float canvasAspect=u_resolution.x/u_resolution.y;float textureAspect=u_textureResolution.x/u_textureResolution.y;if(textureAspect>canvasAspect){uv.x=(uv.x-0.5)*(canvasAspect/textureAspect)+0.5;}else{uv.y=(uv.y-0.5)*(textureAspect/canvasAspect)+0.5;}vec4 color=texture2D(u_texture,uv);float gray=dot(color.rgb,vec3(0.2126,0.7152,0.0722));color.rgb=mix(color.rgb,vec3(gray),clamp(u_desaturate,0.0,1.0));gl_FragColor=color;}`;
 function compile(type,source){const shader=gl.createShader(type);gl.shaderSource(shader,source);gl.compileShader(shader);return shader;}
 const program=gl.createProgram();gl.attachShader(program,compile(gl.VERTEX_SHADER,vertex));gl.attachShader(program,compile(gl.FRAGMENT_SHADER,fragment));gl.linkProgram(program);
 const program02=gl.createProgram();gl.attachShader(program02,compile(gl.VERTEX_SHADER,vertex));gl.attachShader(program02,compile(gl.FRAGMENT_SHADER,fragment02));gl.linkProgram(program02);
@@ -122,7 +130,16 @@ gl.bindTexture(gl.TEXTURE_2D,texture02);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTUR
 gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,1,1,0,gl.RGBA,gl.UNSIGNED_BYTE,new Uint8Array([32,32,32,255]));
 async function loadRandomImage02(attempt=0){try{const api='https://commons.wikimedia.org/w/api.php?action=query&generator=random&grnnamespace=6&grnlimit=1&prop=imageinfo&iiprop=url%7Cmime&iiurlwidth=1024&iiurlheight=1024&format=json&origin=*';const response=await fetch(api,{mode:'cors',cache:'no-store'});if(!response.ok)throw new Error('Wikimedia API request failed');const data=await response.json();const page=Object.values(data.query?.pages||{})[0];const info=page?.imageinfo?.[0];const url=info?.thumburl||info?.url;if(!url)throw new Error('No usable Wikimedia image URL');const image=new Image();image.crossOrigin='anonymous';image.onload=()=>{textureSize02=[image.naturalWidth||image.width,image.naturalHeight||image.height];gl.bindTexture(gl.TEXTURE_2D,texture02);gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,true);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,image);};image.onerror=()=>{if(attempt<2)setTimeout(()=>loadRandomImage02(attempt+1),500);};image.src=url;}catch(error){if(attempt<2)setTimeout(()=>loadRandomImage02(attempt+1),500);}}
 loadRandomImage02();
-const imageUniforms02={resolution:gl.getUniformLocation(program02,'u_resolution'),textureResolution:gl.getUniformLocation(program02,'u_textureResolution'),texture:gl.getUniformLocation(program02,'u_texture')};
+const imageUniforms02={resolution:gl.getUniformLocation(program02,'u_resolution'),textureResolution:gl.getUniformLocation(program02,'u_textureResolution'),texture:gl.getUniformLocation(program02,'u_texture'),desaturate:gl.getUniformLocation(program02,'u_desaturate')};
+const desaturateControl={range:document.getElementById('desaturate'),number:document.getElementById('desaturate-number')};
+const desaturateStorageKey='shader-slop:shader-02-desaturate';
+const savedDesaturate=Number(localStorage.getItem(desaturateStorageKey));
+if(Number.isFinite(savedDesaturate)&&localStorage.getItem(desaturateStorageKey)!==null){const v=Math.min(1,Math.max(0,savedDesaturate));desaturateControl.range.value=v;desaturateControl.number.value=v;}
+function saveDesaturate(value){const v=Math.min(1,Math.max(0,Number(value)||0));desaturateControl.range.value=v;desaturateControl.number.value=v;localStorage.setItem(desaturateStorageKey,String(v));}
+desaturateControl.range.addEventListener('input',()=>saveDesaturate(desaturateControl.range.value));
+desaturateControl.number.addEventListener('input',()=>{const v=Number(desaturateControl.number.value);if(Number.isFinite(v)){desaturateControl.range.value=Math.min(1,Math.max(0,v));localStorage.setItem(desaturateStorageKey,String(desaturateControl.range.value));}});
+desaturateControl.number.addEventListener('change',()=>saveDesaturate(desaturateControl.number.value));
+function desaturateValue(){const v=Number(desaturateControl.number.value);return Number.isFinite(v)?Math.min(1,Math.max(0,v)):0;}
 const names=['frequency','noiseScaleX','noiseScaleY','seed','octaves','lacunarity','gain','jitter','angularScale','radialScale','radialSkew','speed','loopLength','distortion','distortionScaleX','distortionScaleY','distortionXSeedX','distortionXSeedY','distortionYSeedX','distortionYSeedY','hexDistortion','hexScale','hexEdgeWidth','ringRadius','ringWidth','ringInnerGradient','ringOuterGradient'];
 const ids={noiseScaleX:'noise-scale-x',noiseScaleY:'noise-scale-y',angularScale:'angular-scale',radialScale:'radial-scale',radialSkew:'radial-skew',loopLength:'loop-length',distortionScaleX:'distortion-scale-x',distortionScaleY:'distortion-scale-y',distortionXSeedX:'distortion-x-seed-x',distortionXSeedY:'distortion-x-seed-y',distortionYSeedX:'distortion-y-seed-x',distortionYSeedY:'distortion-y-seed-y',hexDistortion:'hex-distortion',hexScale:'hex-scale',hexEdgeWidth:'hex-edge-width',ringRadius:'ring-radius',ringWidth:'ring-width',ringInnerGradient:'ring-inner-gradient',ringOuterGradient:'ring-outer-gradient'};
 const uniforms={resolution:gl.getUniformLocation(program,'u_resolution'),type:gl.getUniformLocation(program,'u_type'),time:gl.getUniformLocation(program,'u_time')};for(const key of names)uniforms[key]=gl.getUniformLocation(program,'u_'+key);
@@ -137,7 +154,7 @@ for(const key of names){const c=controls[key];c.range.addEventListener('input',(
 controls.type.addEventListener('change',save);document.getElementById('reset-parameters').addEventListener('click',()=>{localStorage.removeItem(storageKey);controls.type.value=defaults.type;for(const key of names)setValue(key,defaults[key]);});
 function value(key){const v=Number(controls[key].number.value);return Number.isFinite(v)?v:Number(controls[key].range.value);}
 load();
-function render(time=0){const dpr=window.devicePixelRatio||1;const size=Math.round(canvas.getBoundingClientRect().width*dpr);if(canvas.width!==size||canvas.height!==size){canvas.width=size;canvas.height=size;}gl.viewport(0,0,canvas.width,canvas.height);gl.bindBuffer(gl.ARRAY_BUFFER,buffer);if(activeShader===1){gl.useProgram(program);gl.enableVertexAttribArray(position);gl.vertexAttribPointer(position,2,gl.FLOAT,false,0,0);gl.uniform2f(uniforms.resolution,canvas.width,canvas.height);gl.uniform1i(uniforms.type,Number(controls.type.value));gl.uniform1f(uniforms.time,time*0.001);for(const key of names)gl.uniform1f(uniforms[key],value(key));gl.drawArrays(gl.TRIANGLES,0,6);}else if(activeShader===2){gl.useProgram(program02);gl.enableVertexAttribArray(position02);gl.vertexAttribPointer(position02,2,gl.FLOAT,false,0,0);gl.uniform2f(imageUniforms02.resolution,canvas.width,canvas.height);gl.uniform2f(imageUniforms02.textureResolution,textureSize02[0],textureSize02[1]);gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,texture02);gl.uniform1i(imageUniforms02.texture,0);gl.drawArrays(gl.TRIANGLES,0,6);}requestAnimationFrame(render);}requestAnimationFrame(render);
+function render(time=0){const dpr=window.devicePixelRatio||1;const size=Math.round(canvas.getBoundingClientRect().width*dpr);if(canvas.width!==size||canvas.height!==size){canvas.width=size;canvas.height=size;}gl.viewport(0,0,canvas.width,canvas.height);gl.bindBuffer(gl.ARRAY_BUFFER,buffer);if(activeShader===1){gl.useProgram(program);gl.enableVertexAttribArray(position);gl.vertexAttribPointer(position,2,gl.FLOAT,false,0,0);gl.uniform2f(uniforms.resolution,canvas.width,canvas.height);gl.uniform1i(uniforms.type,Number(controls.type.value));gl.uniform1f(uniforms.time,time*0.001);for(const key of names)gl.uniform1f(uniforms[key],value(key));gl.drawArrays(gl.TRIANGLES,0,6);}else if(activeShader===2){gl.useProgram(program02);gl.enableVertexAttribArray(position02);gl.vertexAttribPointer(position02,2,gl.FLOAT,false,0,0);gl.uniform2f(imageUniforms02.resolution,canvas.width,canvas.height);gl.uniform2f(imageUniforms02.textureResolution,textureSize02[0],textureSize02[1]);gl.uniform1f(imageUniforms02.desaturate,desaturateValue());gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,texture02);gl.uniform1i(imageUniforms02.texture,0);gl.drawArrays(gl.TRIANGLES,0,6);}requestAnimationFrame(render);}requestAnimationFrame(render);
 </script>
 </body>
 </html>
