@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>刀光剑影 Shader</title>
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;width:100%;height:100%;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#07090d;color:#f2f2f2}
+body{overflow:hidden}
+#shader{position:fixed;inset:0;width:100%;height:100%;display:block}
+.panel{position:fixed;z-index:2;top:20px;padding:14px;border:1px solid #252a33;border-radius:12px;background:#11151bdd;box-shadow:0 12px 32px #0009;backdrop-filter:blur(14px)}
+#nav{left:20px;width:220px}
+#parameters{right:20px;width:320px;max-height:calc(100vh - 40px);overflow:auto}
+h1{margin:0 0 10px;font-size:14px;font-weight:650}
+h2{margin:14px 0 7px;font-size:11px;font-weight:650;letter-spacing:.08em;text-transform:uppercase;color:#7c8798}
+a,button,input{font:inherit}
+a{display:block;padding:8px 10px;border-radius:7px;background:#222832;color:#dce7f5;text-decoration:none}
+a+a{margin-top:7px}
+.param-row{display:grid;grid-template-columns:96px 62px minmax(88px,1fr);align-items:center;gap:7px;min-height:30px}
+.param-row+.param-row{margin-top:7px}
+.param-row>span{font-size:12px;color:#aab3c0;white-space:nowrap}
+.param-row input[type="number"]{width:62px;min-width:0;padding:5px 6px;border:0;border-radius:7px;background:#222832;color:#e6edf7;text-align:right;font-size:12px;appearance:textfield;-moz-appearance:textfield}
+.param-row input[type="number"]::-webkit-outer-spin-button,.param-row input[type="number"]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.param-row input[type="range"]{width:100%;min-width:0;margin:0;accent-color:#79dcff}
+.param-row input[type="color"]{grid-column:2/4;width:100%;height:30px;padding:2px;border:0;border-radius:7px;background:#222832}
+button{width:100%;margin-top:14px;padding:8px 10px;border:0;border-radius:7px;background:#222832;color:#dce7f5;cursor:pointer}
+.note{margin:8px 0 0;font-size:11px;line-height:1.45;color:#748092}
+@media(max-width:760px){#nav{top:12px;left:12px;width:170px}#parameters{top:auto;right:12px;bottom:12px;width:calc(100vw - 24px);max-height:44vh}.panel{padding:11px}}
+</style>
+</head>
+<body>
+<canvas id="shader"></canvas>
+<aside id="nav" class="panel">
+<h1>04 刀光剑影</h1>
+<a href="./index.html">← Shader List</a>
+<p class="note">Procedural WebGL slash arc · core · glow · afterimage · sparks</p>
+</aside>
+<aside id="parameters" class="panel">
+<h1>Parameters</h1>
+<h2>Slash</h2>
+<div class="param-row"><span>Intensity</span><input id="intensity-number" type="number" min="0" max="8" step="0.01" value="3.2"><input id="intensity" type="range" min="0" max="8" step="0.01" value="3.2"></div>
+<div class="param-row"><span>Speed</span><input id="speed-number" type="number" min="0.1" max="3" step="0.01" value="0.72"><input id="speed" type="range" min="0.1" max="3" step="0.01" value="0.72"></div>
+<div class="param-row"><span>Radius</span><input id="radius-number" type="number" min="0.25" max="1.1" step="0.001" value="0.63"><input id="radius" type="range" min="0.25" max="1.1" step="0.001" value="0.63"></div>
+<div class="param-row"><span>Thickness</span><input id="thickness-number" type="number" min="0.003" max="0.12" step="0.001" value="0.028"><input id="thickness" type="range" min="0.003" max="0.12" step="0.001" value="0.028"></div>
+<div class="param-row"><span>Arc Length</span><input id="arc-number" type="number" min="0.35" max="1" step="0.001" value="0.86"><input id="arc" type="range" min="0.35" max="1" step="0.001" value="0.86"></div>
+<div class="param-row"><span>Rotation</span><input id="rotation-number" type="number" min="-180" max="180" step="0.1" value="-18"><input id="rotation" type="range" min="-180" max="180" step="0.1" value="-18"></div>
+<h2>Energy</h2>
+<div class="param-row"><span>Glow</span><input id="glow-number" type="number" min="0" max="4" step="0.01" value="1.45"><input id="glow" type="range" min="0" max="4" step="0.01" value="1.45"></div>
+<div class="param-row"><span>Distortion</span><input id="distortion-number" type="number" min="0" max="0.18" step="0.001" value="0.036"><input id="distortion" type="range" min="0" max="0.18" step="0.001" value="0.036"></div>
+<div class="param-row"><span>Afterimage</span><input id="afterimage-number" type="number" min="0" max="2" step="0.01" value="0.85"><input id="afterimage" type="range" min="0" max="2" step="0.01" value="0.85"></div>
+<div class="param-row"><span>Sparks</span><input id="sparks-number" type="number" min="0" max="3" step="0.01" value="1.15"><input id="sparks" type="range" min="0" max="3" step="0.01" value="1.15"></div>
+<div class="param-row"><span>Tint</span><input id="tint" type="color" value="#56d9ff"></div>
+<button id="reset" type="button">Reset Defaults</button>
+</aside>
+<script>
+const canvas=document.getElementById('shader');
+const gl=canvas.getContext('webgl',{alpha:false,antialias:false,preserveDrawingBuffer:false});
+if(!gl)throw new Error('WebGL is not supported');
+const vertex=`
+attribute vec2 a_position;
+void main(){gl_Position=vec4(a_position,0.0,1.0);}
+`;
+const fragment=`
+precision highp float;
+uniform vec2 u_resolution;
+uniform float u_time;
+uniform float u_intensity;
+uniform float u_speed;
+uniform float u_radius;
+uniform float u_thickness;
+uniform float u_arc;
+uniform float u_rotation;
+uniform float u_glow;
+uniform float u_distortion;
+uniform float u_afterimage;
+uniform float u_sparks;
+uniform vec3 u_tint;
+#define PI 3.14159265359
+float sat(float x){return clamp(x,0.0,1.0);}
+float hash11(float p){p=fract(p*.1031);p*=p+33.33;p*=p+p;return fract(p);}
+float hash21(vec2 p){vec3 p3=fract(vec3(p.xyx)*vec3(.1031,.1030,.0973));p3+=dot(p3,p3.yzx+33.33);return fract((p3.x+p3.y)*p3.z);}
+vec2 hash22(vec2 p){float n=hash21(p);return vec2(n,hash21(p+n+17.17));}
+float noise(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.0-2.0*f);return mix(mix(hash21(i),hash21(i+vec2(1,0)),f.x),mix(hash21(i+vec2(0,1)),hash21(i+vec2(1,1)),f.x),f.y);}
+float fbm(vec2 p){float a=.5,s=0.0;for(int i=0;i<5;i++){s+=a*noise(p);p=mat2(1.62,-1.14,1.14,1.62)*p+7.1;a*=.5;}return s;}
+mat2 rot(float a){float c=cos(a),s=sin(a);return mat2(c,-s,s,c);}
+float gauss(float x,float w){x/=max(w,.00001);return exp(-x*x);}
+float angularDistance(float a,float b){return abs(atan(sin(a-b),cos(a-b)));}
+float arcField(vec2 p,float radius,float thickness,float center,float span,float t,float trail,float warp){
+    float a=atan(p.y,p.x);
+    float n=fbm(vec2(a*2.2+u_time*.42,radius*6.0-u_time*.28));
+    float r=length(p)+(n-.5)*warp;
+    float radial=gauss(abs(r-radius),thickness);
+    float da=angularDistance(a,center);
+    float window=1.0-smoothstep(span*.88,span,da);
+    float local=atan(sin(a-(center-span)),cos(a-(center-span)))/(span*2.0);
+    local=fract(local+1.0);
+    float head=fract(t);
+    float behind=fract(head-local+1.0);
+    float moving=smoothstep(trail,0.0,behind)*(1.0-smoothstep(.985,1.0,behind));
+    return radial*window*moving;
+}
+float staticArc(vec2 p,float radius,float thickness,float center,float span,float warp){
+    float a=atan(p.y,p.x);
+    float n=fbm(vec2(a*2.0+u_time*.2,radius*7.0));
+    float r=length(p)+(n-.5)*warp;
+    float radial=gauss(abs(r-radius),thickness);
+    float da=angularDistance(a,center);
+    return radial*(1.0-smoothstep(span*.86,span,da));
+}
+float particles(vec2 p,float t,float amount){
+    vec2 q=rot(-.62)*p;
+    q.x-=.05;
+    float total=0.0;
+    for(int i=0;i<3;i++){
+        float fi=float(i);
+        vec2 cell=floor((q+vec2(t*.34*(1.0+fi*.2),0.0))*vec2(18.0,32.0));
+        vec2 f=fract((q+vec2(t*.34*(1.0+fi*.2),0.0))*vec2(18.0,32.0))-.5;
+        vec2 h=hash22(cell+fi*19.1);
+        float gate=step(.82-amount*.05,h.x);
+        vec2 pos=vec2((h.x-.5)*.45,(h.y-.5)*.95);
+        float d=length((f-pos*.35)*vec2(.45,2.7));
+        total+=gate*gauss(d,.075)*(.45+.55*h.y);
+    }
+    return total;
+}
+void main(){
+    vec2 uv=(gl_FragCoord.xy*2.0-u_resolution.xy)/min(u_resolution.x,u_resolution.y);
+    vec2 p=rot(radians(u_rotation))*uv;
+    float cycle=fract(u_time*u_speed*.38);
+    float attack=smoothstep(.0,.07,cycle);
+    float release=1.0-smoothstep(.56,.92,cycle);
+    float envelope=attack*release;
+    float center=-.18;
+    float span=mix(.58,2.72,u_arc);
+    float mainArc=arcField(p,u_radius,u_thickness,center,span,cycle*1.18,.52,u_distortion)*envelope;
+    float core=pow(sat(mainArc),2.6);
+    float glowArc=arcField(p,u_radius,u_thickness*(3.5+u_glow),center,span,cycle*1.18,.58,u_distortion*1.5)*envelope;
+    float halo=arcField(p,u_radius,u_thickness*(8.0+u_glow*3.5),center,span,cycle*1.18,.64,u_distortion*2.0)*envelope;
+    float ghostA=staticArc(rot(-.055)*p,u_radius*.94,u_thickness*2.5,center,span*.94,u_distortion*1.7)*(1.0-smoothstep(.18,.72,cycle))*u_afterimage;
+    float ghostB=staticArc(rot(-.11)*p,u_radius*.88,u_thickness*4.2,center,span*.88,u_distortion*2.2)*(1.0-smoothstep(.10,.62,cycle))*u_afterimage*.48;
+    float blade=gauss(abs(dot(p,normalize(vec2(.82,-.57)))+.035),.006)*gauss(length(p-vec2(-.08,.05)),1.05)*pow(envelope,1.6)*.55;
+    float spark=particles(p,u_time, u_sparks)*envelope*u_sparks;
+    float flash=gauss(cycle-.08,.035)*gauss(length(p-vec2(-.08,.03)),.33);
+    float vignette=1.0-smoothstep(.72,1.55,length(uv));
+    float grain=(hash21(gl_FragCoord.xy+floor(u_time*60.0))-.5)*.018;
+    vec3 bg=vec3(.009,.013,.021)+vec3(.015,.025,.04)*vignette;
+    float gridX=gauss(abs(fract((uv.x+u_time*.012)*8.0)-.5),.018);
+    float gridY=gauss(abs(fract((uv.y-u_time*.008)*8.0)-.5),.018);
+    bg+=vec3(.01,.018,.03)*(gridX+gridY)*.16;
+    vec3 tint=max(u_tint,vec3(.001));
+    vec3 white=mix(vec3(1.0),normalize(tint+0.0001),.08);
+    vec3 col=bg;
+    col+=tint*halo*.20*u_glow;
+    col+=tint*(glowArc*.72+ghostA*.25+ghostB*.12)*u_glow;
+    col+=mix(tint,vec3(1.0),.58)*(mainArc*1.65+blade*.85);
+    col+=white*core*4.4;
+    col+=mix(tint,vec3(1.0),.45)*spark*.85;
+    col+=white*flash*1.7;
+    col*=u_intensity;
+    col+=grain;
+    col=1.0-exp(-col);
+    col=pow(max(col,0.0),vec3(.92));
+    gl_FragColor=vec4(col,1.0);
+}
+`;
+function compile(type,source){const shader=gl.createShader(type);gl.shaderSource(shader,source);gl.compileShader(shader);if(!gl.getShaderParameter(shader,gl.COMPILE_STATUS))throw new Error(gl.getShaderInfoLog(shader));return shader;}
+const program=gl.createProgram();gl.attachShader(program,compile(gl.VERTEX_SHADER,vertex));gl.attachShader(program,compile(gl.FRAGMENT_SHADER,fragment));gl.linkProgram(program);if(!gl.getProgramParameter(program,gl.LINK_STATUS))throw new Error(gl.getProgramInfoLog(program));
+const buffer=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,buffer);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,-1,1,1,-1,1,1]),gl.STATIC_DRAW);
+const position=gl.getAttribLocation(program,'a_position');
+const uniformNames=['resolution','time','intensity','speed','radius','thickness','arc','rotation','glow','distortion','afterimage','sparks','tint'];
+const uniforms={};for(const name of uniformNames)uniforms[name]=gl.getUniformLocation(program,'u_'+name);
+const keys=['intensity','speed','radius','thickness','arc','rotation','glow','distortion','afterimage','sparks'];
+const controls={};for(const key of keys)controls[key]={range:document.getElementById(key),number:document.getElementById(key+'-number')};
+const tint=document.getElementById('tint');
+const defaults={};for(const key of keys)defaults[key]=controls[key].range.defaultValue;defaults.tint=tint.defaultValue;
+const storageKey='shader-slop:sword-slash';
+function clamp(input,v){return Math.min(Number(input.max),Math.max(Number(input.min),v));}
+function setValue(key,value){const c=controls[key];let v=Number(value);if(!Number.isFinite(v))v=Number(defaults[key]);v=clamp(c.number,v);c.number.value=v;c.range.value=clamp(c.range,v);}
+function save(){const state={tint:tint.value};for(const key of keys)state[key]=controls[key].number.value;localStorage.setItem(storageKey,JSON.stringify(state));}
+function load(){try{const state=JSON.parse(localStorage.getItem(storageKey));if(!state)return;for(const key of keys)if(state[key]!==undefined)setValue(key,state[key]);if(state.tint)tint.value=state.tint;}catch{localStorage.removeItem(storageKey);}}
+for(const key of keys){const c=controls[key];c.range.addEventListener('input',()=>{c.number.value=c.range.value;save();});c.number.addEventListener('input',()=>{const v=Number(c.number.value);if(Number.isFinite(v)){c.range.value=clamp(c.range,v);save();}});c.number.addEventListener('change',()=>{setValue(key,c.number.value);save();});}
+tint.addEventListener('input',save);
+document.getElementById('reset').addEventListener('click',()=>{localStorage.removeItem(storageKey);for(const key of keys)setValue(key,defaults[key]);tint.value=defaults.tint;});
+load();
+function value(key){const v=Number(controls[key].number.value);return Number.isFinite(v)?v:Number(controls[key].range.value);}
+function hexRgb(hex){return [parseInt(hex.slice(1,3),16)/255,parseInt(hex.slice(3,5),16)/255,parseInt(hex.slice(5,7),16)/255];}
+function render(ms){const dpr=Math.min(window.devicePixelRatio||1,2);const w=Math.max(1,Math.round(canvas.clientWidth*dpr)),h=Math.max(1,Math.round(canvas.clientHeight*dpr));if(canvas.width!==w||canvas.height!==h){canvas.width=w;canvas.height=h;}gl.viewport(0,0,w,h);gl.useProgram(program);gl.bindBuffer(gl.ARRAY_BUFFER,buffer);gl.enableVertexAttribArray(position);gl.vertexAttribPointer(position,2,gl.FLOAT,false,0,0);gl.uniform2f(uniforms.resolution,w,h);gl.uniform1f(uniforms.time,ms*.001);for(const key of keys)gl.uniform1f(uniforms[key],value(key));const rgb=hexRgb(tint.value);gl.uniform3f(uniforms.tint,rgb[0],rgb[1],rgb[2]);gl.drawArrays(gl.TRIANGLES,0,6);requestAnimationFrame(render);}
+requestAnimationFrame(render);
+</script>
+</body>
+</html>
