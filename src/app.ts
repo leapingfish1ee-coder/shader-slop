@@ -1,6 +1,6 @@
 import './styles.css';
-import { registerWGSL, monaco } from './editor/wgsl';
-import { builtInPresets, starterWGSL } from './shaders/presets';
+import { registerGLSL, monaco } from './editor/glsl';
+import { builtInPresets, starterGLSL } from './shaders/presets';
 import {
   createProject,
   ensurePresets,
@@ -10,7 +10,7 @@ import {
   removeProject,
   type ShaderProject,
 } from './storage/projects';
-import { WebGPURenderer, type CompileMessage } from './webgpu/renderer';
+import { WebGL2Renderer, type CompileMessage } from './webgl2/renderer';
 
 const app = document.querySelector<HTMLDivElement>('#app');
 if (!app) throw new Error('App root is missing.');
@@ -20,7 +20,7 @@ app.innerHTML = `
     <header class="topbar">
       <div class="brand">
         <strong>Shader Slop Lab</strong>
-        <span class="badge" id="gpu-badge">WebGPU</span>
+        <span class="badge" id="gpu-badge">GLSL ES 3.00</span>
       </div>
       <div class="toolbar toolbar-grow">
         <input id="project-name" class="project-name" aria-label="Project name" />
@@ -58,15 +58,15 @@ app.innerHTML = `
           <button id="duplicate-project" type="button">Duplicate</button>
           <button id="delete-project" type="button">Delete</button>
           <button id="export-project" type="button">Export</button>
-          <label class="file-button">Import<input id="import-project" type="file" accept=".json,.wgsl,application/json,text/plain" hidden /></label>
+          <label class="file-button">Import<input id="import-project" type="file" accept=".json,.glsl,.frag,.fs,application/json,text/plain" hidden /></label>
         </div>
-        <div id="library-note" class="library-note">IndexedDB autosave · JSON/WGSL import/export</div>
+        <div id="library-note" class="library-note">IndexedDB autosave · JSON/GLSL import/export</div>
       </aside>
 
       <section class="editor-panel panel">
         <div class="panel-title-row">
           <div>
-            <div class="eyebrow">WGSL SOURCE</div>
+            <div class="eyebrow">GLSL ES 3.00 FRAGMENT</div>
             <span id="save-state">saved</span>
           </div>
           <div class="shortcut-hint">⌘/Ctrl+Enter compile · ⌘/Ctrl+S save</div>
@@ -77,7 +77,7 @@ app.innerHTML = `
       <section class="preview-panel panel">
         <div class="panel-title-row">
           <div>
-            <div class="eyebrow">LIVE OUTPUT</div>
+            <div class="eyebrow">LIVE OUTPUT · WEBGL2</div>
             <span id="resolution">-- × --</span>
           </div>
           <span id="compile-time" class="metric">-- ms</span>
@@ -125,7 +125,11 @@ const previewMessage = $<HTMLDivElement>('#preview-message');
 const gpuBadge = $<HTMLSpanElement>('#gpu-badge');
 const canvas = $<HTMLCanvasElement>('#preview');
 
-registerWGSL();
+registerGLSL();
+
+function isGLSL300(code: string): boolean {
+  return /^\s*#version\s+300\s+es\b/m.test(code);
+}
 
 function presetProject(index = 0): ShaderProject {
   const preset = builtInPresets[index] ?? builtInPresets[0];
@@ -142,17 +146,17 @@ function presetProject(index = 0): ShaderProject {
 }
 
 let projects: ShaderProject[] = builtInPresets.map((_, index) => presetProject(index));
-let currentProject: ShaderProject = projects[0] ?? createProject('01 WebGPU Starter', starterWGSL);
+let currentProject: ShaderProject = projects[0] ?? createProject('01 GLSL ES 3.00 Starter', starterGLSL);
 let dirty = false;
 let suppressEditorEvents = false;
 let saveTimer = 0;
 let compileTimer = 0;
 let compileRequest = 0;
-let renderer: WebGPURenderer | null = null;
+let renderer: WebGL2Renderer | null = null;
 let storageReady = false;
 let memoryOnly = false;
 
-const model = monaco.editor.createModel(currentProject.code, 'wgsl');
+const model = monaco.editor.createModel(currentProject.code, 'glsl');
 const editor = monaco.editor.create($('#editor'), {
   model,
   theme: 'vs-dark',
@@ -173,8 +177,6 @@ const editor = monaco.editor.create($('#editor'), {
 projectName.value = currentProject.name;
 renderProjectList();
 
-// Bind every interaction before IndexedDB, adapter/device acquisition, or WGSL compilation.
-// The shell remains usable even when any asynchronous subsystem is slow or unavailable.
 editor.onDidChangeModelContent(() => {
   if (suppressEditorEvents) return;
   currentProject.code = editor.getValue();
@@ -223,7 +225,6 @@ window.addEventListener('beforeunload', () => {
   if (dirty) void saveCurrent(false);
 });
 
-// Start slow/optional subsystems only after the UI is interactive.
 void initializeStorage();
 void initializeRenderer();
 
@@ -236,8 +237,9 @@ async function initializeStorage(): Promise<void> {
     if (!stored.length) return;
 
     const activeId = localStorage.getItem('shader-slop-lab:active-project');
-    const active = activeId ? stored.find((project) => project.id === activeId) : undefined;
-    const next = active ?? stored[0];
+    const active = activeId ? stored.find((project) => project.id === activeId && isGLSL300(project.code)) : undefined;
+    const next = active ?? stored.find((project) => isGLSL300(project.code)) ?? stored[0];
+
     projects = stored;
     currentProject = next;
     projectName.value = next.name;
@@ -260,31 +262,27 @@ async function initializeStorage(): Promise<void> {
 
 async function initializeRenderer(): Promise<void> {
   try {
-    renderer = await withTimeout(WebGPURenderer.create(canvas), 8000, 'WebGPU device initialization timed out.');
+    renderer = await withTimeout(WebGL2Renderer.create(canvas), 3000, 'WebGL2 initialization timed out.');
     renderer.onStats = (stats) => {
       fps.textContent = `${stats.fps.toFixed(0)} fps`;
       resolution.textContent = `${stats.width} × ${stats.height}`;
     };
-    renderer.onDeviceLost = (message) => {
-      setStatus('error', 'device lost');
-      showPreviewMessage(`${message}\nReload the page to request a new WebGPU device.`);
-    };
     renderer.setRenderScale(Number(scaleSelect.value));
     renderer.start();
-    gpuBadge.textContent = 'WebGPU ready';
+    gpuBadge.textContent = 'GLSL ES 3.00 · WebGL2';
     gpuBadge.classList.add('ready');
     setStatus('neutral', 'compiling');
     await compileCurrent();
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     renderer = null;
-    setStatus('error', 'WebGPU unavailable');
-    gpuBadge.textContent = 'WebGPU unavailable';
+    setStatus('error', 'WebGL2 unavailable');
+    gpuBadge.textContent = 'WebGL2 unavailable';
     gpuBadge.classList.add('error');
     compileButton.disabled = true;
     pauseButton.disabled = true;
     scaleSelect.disabled = true;
-    showPreviewMessage(`${message}\n\nUse a current WebGPU-capable browser in a secure context. The editor and project library remain usable.`);
+    showPreviewMessage(`${message}\n\nGLSL ES 3.00 requires WebGL2. The editor and project library remain usable.`);
   }
 }
 
@@ -411,17 +409,31 @@ async function saveCurrent(showFeedback: boolean): Promise<void> {
 
 async function compileCurrent(): Promise<void> {
   if (!renderer) {
-    setStatus('neutral', 'GPU initializing');
+    setStatus('neutral', 'renderer initializing');
     return;
   }
+
   window.clearTimeout(compileTimer);
+  const source = editor.getValue();
+
+  if (!isGLSL300(source)) {
+    const message = 'Primary editor requires GLSL ES 3.00. Add “#version 300 es” as the first directive.';
+    setStatus('error', 'GLSL ES 3.00 required');
+    applyDiagnostics([{ type: 'error', message, lineNum: 1, linePos: 1, length: 1 }]);
+    showPreviewMessage(message);
+    return;
+  }
+
   const request = ++compileRequest;
   setStatus('neutral', 'compiling');
+
   try {
-    const result = await withTimeout(renderer.compile(editor.getValue()), 10000, 'WGSL compilation timed out.');
+    const result = await withTimeout(renderer.compile(source), 5000, 'GLSL ES 3.00 compilation timed out.');
     if (request !== compileRequest) return;
+
     compileTime.textContent = `${result.durationMs.toFixed(1)} ms`;
     applyDiagnostics(result.messages);
+
     if (result.ok) {
       const warnings = result.messages.filter((message) => message.type === 'warning').length;
       setStatus(warnings ? 'warning' : 'ok', warnings ? `compiled · ${warnings} warning` : 'compiled');
@@ -443,6 +455,7 @@ function applyDiagnostics(messages: CompileMessage[]): void {
     const maxColumn = model.getLineMaxColumn(line);
     const startColumn = Math.min(Math.max(message.linePos, 1), maxColumn);
     const endColumn = Math.min(maxColumn, Math.max(startColumn + message.length, startColumn + 1));
+
     return {
       severity: message.type === 'error'
         ? monaco.MarkerSeverity.Error
@@ -456,11 +469,13 @@ function applyDiagnostics(messages: CompileMessage[]): void {
       endColumn,
     };
   });
-  monaco.editor.setModelMarkers(model, 'webgpu-wgsl', markers);
+
+  monaco.editor.setModelMarkers(model, 'webgl2-glsl300', markers);
   diagnosticCount.textContent = String(messages.length);
   diagnostics.innerHTML = messages.length
     ? messages.map((message) => `<button class="diagnostic ${message.type}" data-line="${message.lineNum}" data-column="${message.linePos}"><span>${escapeHTML(message.type.toUpperCase())}</span><b>${message.lineNum}:${message.linePos}</b><em>${escapeHTML(message.message)}</em></button>`).join('')
     : '<div class="diagnostic-empty">No diagnostics.</div>';
+
   diagnostics.querySelectorAll<HTMLButtonElement>('.diagnostic').forEach((item) => {
     item.addEventListener('click', () => {
       const lineNumber = Number(item.dataset.line) || 1;
@@ -475,9 +490,10 @@ function applyDiagnostics(messages: CompileMessage[]): void {
 function renderProjectList(): void {
   projectList.innerHTML = projects.map((project) => {
     const active = project.id === currentProject.id ? ' active' : '';
-    const origin = project.origin === 'builtin' ? '<span class="project-tag">seed</span>' : '';
-    return `<button type="button" class="project-item${active}" data-id="${escapeHTML(project.id)}"><span class="project-title">${escapeHTML(project.name)}</span>${origin}<small>${formatTime(project.updatedAt)}</small></button>`;
+    const tag = isGLSL300(project.code) ? 'GLSL 300' : 'archive';
+    return `<button type="button" class="project-item${active}" data-id="${escapeHTML(project.id)}"><span class="project-title">${escapeHTML(project.name)}</span><span class="project-tag">${tag}</span><small>${formatTime(project.updatedAt)}</small></button>`;
   }).join('');
+
   projectList.querySelectorAll<HTMLButtonElement>('.project-item').forEach((item) => {
     item.addEventListener('click', () => void switchProject(item.dataset.id || ''));
   });
@@ -486,8 +502,10 @@ function renderProjectList(): void {
 async function switchProject(id: string): Promise<void> {
   if (!id || id === currentProject.id) return;
   if (dirty) await saveCurrent(false);
+
   const next = await fetchProject(id);
   if (!next) return;
+
   currentProject = next;
   projectName.value = next.name;
   suppressEditorEvents = true;
@@ -504,7 +522,8 @@ async function switchProject(id: string): Promise<void> {
 
 async function createNewProject(): Promise<void> {
   if (dirty) await saveCurrent(false);
-  const next = createProject('Untitled Shader', starterWGSL);
+
+  const next = createProject('Untitled GLSL Shader', starterGLSL);
   await persistProject(next);
   await refreshProjects();
   currentProject = next;
@@ -520,7 +539,9 @@ async function createNewProject(): Promise<void> {
 
 async function duplicateCurrentProject(): Promise<void> {
   if (dirty) await saveCurrent(false);
-  const copy = createProject(`${currentProject.name} Copy`, editor.getValue());
+
+  const code = isGLSL300(editor.getValue()) ? editor.getValue() : starterGLSL;
+  const copy = createProject(`${currentProject.name} Copy`, code);
   copy.description = currentProject.description;
   await persistProject(copy);
   await refreshProjects();
@@ -536,14 +557,17 @@ async function duplicateCurrentProject(): Promise<void> {
 
 async function deleteCurrentProject(): Promise<void> {
   if (!confirm(`Delete “${currentProject.name}” from this browser?`)) return;
+
   await eraseProject(currentProject.id);
   await refreshProjects();
+
   if (!projects.length) {
-    const replacement = createProject('Untitled Shader', starterWGSL);
+    const replacement = createProject('Untitled GLSL Shader', starterGLSL);
     await persistProject(replacement);
     await refreshProjects();
   }
-  currentProject = projects[0];
+
+  currentProject = projects.find((project) => isGLSL300(project.code)) ?? projects[0];
   localStorage.setItem('shader-slop-lab:active-project', currentProject.id);
   projectName.value = currentProject.name;
   suppressEditorEvents = true;
@@ -557,7 +581,9 @@ async function deleteCurrentProject(): Promise<void> {
 function exportCurrentProject(): void {
   const payload = {
     format: 'shader-slop-lab/project',
-    version: 1,
+    version: 2,
+    language: isGLSL300(editor.getValue()) ? 'glsl-es-300' : 'archived-source',
+    backend: isGLSL300(editor.getValue()) ? 'webgl2' : 'none',
     exportedAt: new Date().toISOString(),
     project: {
       name: currentProject.name,
@@ -565,6 +591,7 @@ function exportCurrentProject(): void {
       code: editor.getValue(),
     },
   };
+
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement('a');
@@ -578,15 +605,22 @@ async function importProject(): Promise<void> {
   const file = importInput.files?.[0];
   importInput.value = '';
   if (!file) return;
+
   const text = await file.text();
-  let name = file.name.replace(/\.(shader\.json|json|wgsl)$/i, '') || 'Imported Shader';
+  let name = file.name.replace(/\.(shader\.json|json|glsl|frag|fs)$/i, '') || 'Imported GLSL Shader';
   let code = text;
   let description = '';
+
   if (file.name.toLowerCase().endsWith('.json')) {
     try {
-      const parsed = JSON.parse(text) as { project?: { name?: string; description?: string; code?: string }; name?: string; code?: string; description?: string };
+      const parsed = JSON.parse(text) as {
+        project?: { name?: string; description?: string; code?: string };
+        name?: string;
+        description?: string;
+        code?: string;
+      };
       const source = parsed.project ?? parsed;
-      if (typeof source.code !== 'string') throw new Error('No WGSL code found in JSON.');
+      if (typeof source.code !== 'string') throw new Error('No shader source found in JSON.');
       code = source.code;
       name = source.name || name;
       description = typeof source.description === 'string' ? source.description : '';
@@ -595,7 +629,9 @@ async function importProject(): Promise<void> {
       return;
     }
   }
+
   if (dirty) await saveCurrent(false);
+
   const imported = createProject(name, code, 'import');
   imported.description = description;
   await persistProject(imported);
@@ -611,11 +647,22 @@ async function importProject(): Promise<void> {
 }
 
 function escapeHTML(value: string): string {
-  return value.replace(/[&<>'"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[char] || char);
+  return value.replace(/[&<>'"]/g, (char) => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    "'": '&#39;',
+    '"': '&quot;',
+  })[char] || char);
 }
 
 function formatTime(timestamp: number): string {
-  return new Intl.DateTimeFormat(undefined, { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }).format(timestamp);
+  return new Intl.DateTimeFormat(undefined, {
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(timestamp);
 }
 
 function safeFilename(value: string): string {
