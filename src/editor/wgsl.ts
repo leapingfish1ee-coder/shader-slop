@@ -1,5 +1,5 @@
 import * as monaco from 'monaco-editor';
-import EditorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker';
+import EditorWorker from 'monaco-editor/esm/vs/editor/editor.worker.js?worker';
 
 (self as unknown as { MonacoEnvironment: { getWorker(): Worker } }).MonacoEnvironment = {
   getWorker() {
