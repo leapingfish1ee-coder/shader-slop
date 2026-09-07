@@ -1,0 +1,21 @@
+{
+  "name": "shader-slop-lab",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "typecheck": "tsc --noEmit --pretty false",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "idb": "^8.0.3",
+    "monaco-editor": "^0.56.0"
+  },
+  "devDependencies": {
+    "@webgpu/types": "^0.1.71",
+    "typescript": "^7.0.2",
+    "vite": "^8.2.2"
+  }
+}
