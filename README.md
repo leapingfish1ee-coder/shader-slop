@@ -1,44 +1,52 @@
 # Shader Slop Lab
 
-A personal, browser-native WebGPU shader laboratory for writing WGSL, compiling it live, rendering at interactive frame rates, and keeping experiments in a local project library.
+A browser-native personal shader laboratory focused on **GLSL ES 3.00 + WebGL2** for live coding, compilation diagnostics, interactive rendering, and local experiment storage.
 
-## Architecture
+## Primary architecture
 
-- **Vite + TypeScript** — fast local dev/build pipeline and typed browser code.
-- **WebGPU + WGSL** — native browser shader compilation and GPU rendering.
-- **Monaco Editor** — code editing, WGSL syntax highlighting, keyboard shortcuts, and compiler markers.
-- **IndexedDB via `idb`** — persistent shader project storage in the browser.
-- **GitHub Pages** — static deployment from the production `dist` build.
-- **Legacy workspace** — the original WebGL 01–04 experiments remain available at `legacy.html`.
+- **Vite + TypeScript** — local development and production builds.
+- **GLSL ES 3.00 + WebGL2** — the primary shader language and live rendering backend.
+- **Monaco Editor** — GLSL syntax highlighting, editing, compiler markers, and shortcuts.
+- **IndexedDB via `idb`** — persistent browser-side shader project storage.
+- **GitHub Pages** — production deployment.
+- **Legacy / archived sources** — the original WebGL experiments remain at `legacy.html`; the earlier WebGPU/WGSL implementation remains in the repository as secondary reference code.
 
-## Live compiler behavior
+## GLSL ES 3.00 contract
 
-Every editor change is debounced and compiled with `GPUShaderModule.getCompilationInfo()`. Errors and warnings are shown in the diagnostics panel and mapped into Monaco markers. A failed compile does **not** replace the last valid render pipeline, so the preview remains stable while code is being repaired.
+The main editor contains the **fragment shader**. Every primary project begins with:
 
-The renderer uses `createRenderPipelineAsync`, a fixed global bind-group layout, a fullscreen triangle, one uniform-buffer write per frame, and a configurable render scale.
-
-## WGSL contract
-
-A project should provide these entry points:
-
-```wgsl
-@vertex fn vsMain(@builtin(vertex_index) vertexIndex: u32) -> VSOut
-@fragment fn fsMain(in: VSOut) -> @location(0) vec4f
+```glsl
+#version 300 es
+precision highp float;
 ```
 
-The lab reserves `@group(0) @binding(0)` for two packed `vec4f` globals:
+The lab supplies a fixed fullscreen-triangle vertex shader with:
 
-```wgsl
-struct Globals {
-  resolutionTimeDelta: vec4f, // xy = render resolution, z = time seconds, w = frame delta
-  mouseStateFrame: vec4f,     // xy = mouse in render pixels, z = pointer down, w = frame index
-};
-@group(0) @binding(0) var<uniform> globals: Globals;
+```glsl
+out vec2 v_uv;
 ```
+
+The fragment shader can use:
+
+```glsl
+in vec2 v_uv;
+out vec4 outColor;
+
+uniform vec2 u_resolution;   // render pixels
+uniform float u_time;        // seconds since renderer start
+uniform float u_delta;       // seconds since previous frame
+uniform vec2 u_mouse;        // pointer in render pixels, origin bottom-left
+uniform float u_pointerDown; // 0.0 or 1.0
+uniform float u_frame;       // rendered frame index
+```
+
+Compile and link errors from WebGL2 are mapped into the diagnostics panel and Monaco markers. A failed compile keeps the last valid linked program running.
 
 ## Project library
 
-Projects autosave to IndexedDB. Use **Export** to create a portable `.shader.json` backup and **Import** to restore JSON or raw `.wgsl` files. The first run seeds a few WebGPU examples, including a WGSL sword-trail study with glow and directional smear.
+Projects autosave to IndexedDB. Built-in GLSL presets are seeded into existing libraries, including migration of the old built-in WGSL presets to their GLSL ES 3.00 replacements. User-created archived sources are not deleted.
+
+Use **Export** for portable `.shader.json` backups and **Import** for `.shader.json`, `.glsl`, `.frag`, or `.fs` files.
 
 ## Local development
 
@@ -47,7 +55,7 @@ npm install
 npm run dev
 ```
 
-Type-check and build:
+Type-check and production build:
 
 ```bash
 npm run typecheck
@@ -61,4 +69,4 @@ npm run build
 
 ## Browser requirements
 
-WebGPU requires a current WebGPU-capable browser and a secure context (HTTPS or localhost). GitHub Pages satisfies the secure-context requirement. If WebGPU is unavailable, the editor/library remain visible and the legacy WebGL workspace can still be opened.
+The primary lab requires WebGL2, which is the browser API exposing GLSL ES 3.00. The older `legacy.html` workspace remains available separately.
