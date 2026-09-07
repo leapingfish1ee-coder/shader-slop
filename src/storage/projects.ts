@@ -26,23 +26,31 @@ const dbPromise = openDB<ShaderLabDB>('shader-slop-lab', 1, {
   },
 });
 
+function isGLSL300(code: string): boolean {
+  return /^\s*#version\s+300\s+es\b/m.test(code);
+}
+
 export async function ensurePresets(presets: ShaderPreset[]): Promise<void> {
   const db = await dbPromise;
-  const count = await db.count('projects');
-  if (count > 0) return;
   const tx = db.transaction('projects', 'readwrite');
   const now = Date.now();
+
   for (const [index, preset] of presets.entries()) {
+    const existing = await tx.store.get(preset.id);
+    const shouldSeed = !existing || (existing.origin === 'builtin' && !isGLSL300(existing.code));
+    if (!shouldSeed) continue;
+
     await tx.store.put({
       id: preset.id,
       name: preset.name,
       description: preset.description,
       code: preset.code,
-      createdAt: now - index,
+      createdAt: existing?.createdAt ?? now - index,
       updatedAt: now - index,
       origin: 'builtin',
     });
   }
+
   await tx.done;
 }
 
